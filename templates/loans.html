@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}Loans{% endblock %}
+{% block content %}
+<h2 style="color:var(--primary);">🏦 Loans</h2>
+<div class="card">
+    <h4>Request Loan</h4>
+    <form id="loanForm">
+        <div class="form-group"><label>Amount (KES)</label><input type="number" id="loanAmount" required></div>
+        <div class="form-group"><label>Purpose</label><input type="text" id="loanPurpose" required></div>
+        <div class="form-group"><label>M‑Pesa Number to Receive</label><input type="text" id="loanMpesa" required></div>
+        <button type="submit" class="btn">📩 Request</button>
+    </form>
+</div>
+<div id="loansList"></div>
+<script>
+    const token = '{{ token }}';
+    async function loadLoans() {
+        const res = await fetch('/api/loans', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('loansList').innerHTML = data.map(l => `
+            <div class="card-item flex-between">
+                <div><strong>${l.borrower_name}</strong> – KES ${l.amount} – Status: ${l.status} ${l.interest_rate ? `(Interest: ${l.interest_rate}%)` : ''}</div>
+                <div>
+                    ${l.status === 'pending' ? `<button class="btn" style="padding:4px 12px; font-size:12px;" onclick="approveLoan(${l.id})">Approve</button>
+                    <button class="btn btn-danger" style="padding:4px 12px; font-size:12px;" onclick="rejectLoan(${l.id})">Reject</button>` : ''}
+                    ${l.status === 'approved' ? `<button class="btn" style="padding:4px 12px; font-size:12px;" onclick="repayLoan(${l.id})">Repay</button>` : ''}
+                </div>
+            </div>
+        `).join('') || '<div class="card-item">No loans.</div>';
+    }
+    document.getElementById('loanForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const amount = document.getElementById('loanAmount').value;
+        const purpose = document.getElementById('loanPurpose').value;
+        const mpesa = document.getElementById('loanMpesa').value;
+        const res = await fetch('/api/loans', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: parseFloat(amount), purpose, mpesa_number: mpesa })
+        });
+        if (res.ok) { alert('Loan request submitted.'); loadLoans(); }
+        else { const err = await res.json(); alert('Error: ' + err.error); }
+    });
+    async function approveLoan(id) {
+        if (!confirm('Approve?')) return;
+        const res = await fetch(`/api/loans/${id}/approve`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        alert(data.message || data.error);
+        loadLoans();
+    }
+    async function rejectLoan(id) {
+        if (!confirm('Reject?')) return;
+        const res = await fetch(`/api/loans/${id}/reject`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) { alert('Loan rejected.'); loadLoans(); }
+        else { const err = await res.json(); alert('Error: ' + err.error); }
+    }
+    async function repayLoan(id) {
+        if (!confirm('Repay? (STK Push will be initiated)')) return;
+        const res = await fetch(`/api/loans/${id}/repay`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        alert(data.message || data.error);
+        loadLoans();
+    }
+    loadLoans();
+</script>
+{% endblock %}

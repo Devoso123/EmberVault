@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Profile{% endblock %}
+{% block content %}
+<h2 style="color:var(--primary);">👤 Your Profile</h2>
+<div class="card">
+    <form id="profileForm">
+        <div class="form-group"><label>Full Name</label><input type="text" id="profileName" required></div>
+        <div class="form-group"><label>Primary Phone</label><input type="text" id="profilePhone" required></div>
+        <div class="form-group"><label>Email</label><span id="profileEmail" class="text-muted"></span></div>
+        <div class="form-group"><label>Role</label><span id="profileRole" class="text-muted"></span></div>
+        <button type="submit" class="btn">💾 Update Profile</button>
+    </form>
+</div>
+<div class="card">
+    <h4>Change Password</h4>
+    <form id="passwordForm">
+        <div class="form-group password-toggle">
+            <label>New Password</label>
+            <input type="password" id="newPassword" required>
+            <button type="button" class="toggle-btn" onclick="togglePassword('newPassword', this)">👁️</button>
+        </div>
+        <button type="submit" class="btn">🔑 Change Password</button>
+    </form>
+</div>
+<script>
+    const token = '{{ token }}';
+    async function loadProfile() {
+        const res = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('profileName').value = data.name;
+        document.getElementById('profilePhone').value = data.primary_phone;
+        document.getElementById('profileEmail').textContent = data.email;
+        document.getElementById('profileRole').textContent = data.role;
+    }
+    document.getElementById('profileForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const name = document.getElementById('profileName').value;
+        const phone = document.getElementById('profilePhone').value;
+        const res = await fetch('/api/me', {
+            method: 'PUT',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, primary_phone: phone })
+        });
+        if (res.ok) { alert('Profile updated.'); loadProfile(); }
+        else { const err = await res.json(); alert('Error: ' + err.error); }
+    });
+    document.getElementById('passwordForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const password = document.getElementById('newPassword').value;
+        const res = await fetch('/api/change-password', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ new_password: password })
+        });
+        const data = await res.json();
+        alert(data.message || data.error);
+    });
+    loadProfile();
+</script>
+{% endblock %}

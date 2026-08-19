@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Embervault – {% block title %}{% endblock %}</title>
+    
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="manifest" href="/static/manifest.json">
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/service-worker.js');
+        }
+    </script>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    <div class="container">
+        <div class="header">
+            <h1>🏛️ Ember<span>vault</span></h1>
+            <div class="user-info">
+                {% if user %}
+                <span class="name">{{ user.name }}</span>
+                <span class="role">{{ user.role }}{% if user.is_superuser %} ★{% endif %}</span>
+                
+                <!-- Notification Bell -->
+                <div class="notifications-wrapper" style="position:relative;display:inline-block;">
+                    <button onclick="toggleNotifications()" style="background:none;border:none;color:var(--cream);font-size:24px;cursor:pointer;">
+                        🔔 <span id="notifCount" style="font-size:12px;background:red;color:white;border-radius:50%;padding:2px 6px;position:absolute;top:-8px;right:-12px;">0</span>
+                    </button>
+                    <div id="notifDropdown" style="display:none;position:absolute;right:0;top:40px;background:var(--card);color:var(--text);width:300px;max-height:400px;overflow-y:auto;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.2);padding:10px;z-index:1000;">
+                        <div id="notifList"></div>
+                        <button onclick="markAllRead()" style="width:100%;padding:8px;background:var(--primary);color:white;border:none;border-radius:4px;cursor:pointer;">Mark All Read</button>
+                    </div>
+                </div>
+
+                <a href="/logout" class="btn btn-outline" style="padding:6px 16px; font-size:14px;">Logout</a>
+                {% else %}
+                <a href="/login" class="btn">Login</a>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="content">
+            {% if user and user.agreed_to_policy %}
+            <div class="nav">
+                <a href="/dashboard" {% if request.path == '/dashboard' %}class="active"{% endif %}>💰 Capital</a>
+                <a href="/pledges" {% if request.path == '/pledges' %}class="active"{% endif %}>📌 Pledges</a>
+                <a href="/loans" {% if request.path == '/loans' %}class="active"{% endif %}>🏦 Loans</a>
+                <a href="/payments" {% if request.path == '/payments' %}class="active"{% endif %}>💳 Payments</a>
+                <a href="/withdrawals" {% if request.path == '/withdrawals' %}class="active"{% endif %}>🏧 Withdrawals</a>
+                <a href="/profile" {% if request.path == '/profile' %}class="active"{% endif %}>👤 Profile</a>
+                <a href="/support" {% if request.path == '/support' %}class="active"{% endif %}>💬 Support</a>
+                {% if user.is_superuser %}
+                <a href="/admin" class="admin" {% if request.path == '/admin' %}class="active"{% endif %}>⚙️ Admin</a>
+                {% endif %}
+            </div>
+            {% endif %}
+            
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+                {% endfor %}
+            {% endwith %}
+            
+            {% block content %}{% endblock %}
+        </div>
+    </div>
+
+    <script>
+        // ---- Theme logic ----
+        function setTheme(theme) {
+            document.documentElement.className = 'theme-' + theme;
+            localStorage.setItem('theme', theme);
+        }
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        setTheme(savedTheme);
+
+        // ---- Password toggle ----
+        function togglePassword(id, btn) {
+            const input = document.getElementById(id);
+            if (input.type === 'password') {
+                input.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        // ---- Notification functions ----
+        const token = '{{ session.get("token", "") }}';
+
+        async function loadNotifications() {
+            if (!token) return;
+            const res = await fetch('/api/notifications', { headers: { 'Authorization': 'Bearer ' + token } });
+            const data = await res.json();
+            const count = data.length;
+            document.getElementById('notifCount').textContent = count;
+            
+            const list = document.getElementById('notifList');
+            list.innerHTML = data.map(n => `
+                <div style="padding:8px;border-bottom:1px solid var(--border);">
+                    <strong>${n.title}</strong>
+                    <p style="margin:4px 0;font-size:14px;">${n.message}</p>
+                    <small style="color:var(--text-light);">${n.created_at}</small>
+                    <button onclick="markRead(${n.id})" style="float:right;background:var(--primary);color:white;border:none;border-radius:4px;padding:2px 8px;cursor:pointer;">✓</button>
+                </div>
+            `).join('') || '<p style="text-align:center;color:var(--text-light);">No notifications</p>';
+        }
+
+        async function markRead(id) {
+            await fetch(`/api/notifications/${id}/read`, { 
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            loadNotifications();
+        }
+
+        async function markAllRead() {
+            await fetch('/api/notifications/mark-all-read', {
+                method: 'POST',
+                headers: { 'Authorization': 'Bearer ' + token }
+            });
+            loadNotifications();
+        }
+
+        function toggleNotifications() {
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+            if (dropdown.style.display === 'block') loadNotifications();
+        }
+
+        // Load notifications if logged in
+        if (token) loadNotifications();
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

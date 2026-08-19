@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+
+{# --- Agreement Box (shown only if not agreed) --- #}
+{% if not user.agreed_to_policy %}
+<div style="background:#f8e8d0; padding:20px; border-radius:12px; margin-bottom:20px;">
+    <div style="max-height:200px; overflow-y:auto; background:#fff; padding:15px; border-radius:8px; margin-bottom:15px;">
+        <h4>📜 Embervault Policies</h4>
+        <p>
+            1. All members must act in good faith.<br>
+            2. Pledges are binding.<br>
+            3. Loans must be repaid with interest (heads 0%, members 5% per month).<br>
+            4. Any misuse will result in account suspension.<br>
+            5. By clicking "I Abide" you agree to these terms.
+        </p>
+    </div>
+    <button class="btn" onclick="acceptAgreement()">I Abide</button>
+    <button class="btn btn-danger" onclick="declineAgreement()">Decline</button>
+</div>
+{% endif %}
+
+{# --- Dashboard Content (hidden until agreement) --- #}
+<div id="dashboardContent" style="{% if not user.agreed_to_policy %}display:none;{% endif %}">
+    <h2 style="color:var(--primary);">💰 Group Capital</h2>
+    <div style="font-size:32px; font-weight:300; color:var(--gold);" id="capitalBalance">Loading...</div>
+    <button class="btn" onclick="refreshCapital()">↻ Refresh</button>
+    <hr>
+    <h3>👥 Members</h3>
+    <div id="membersList"></div>
+    <hr>
+    <h3>📊 Today's Transactions</h3>
+    <div id="transactionsList"></div>
+</div>
+
+<button class="btn btn-gold" onclick="depositFunds()">💰 Add Funds</button>
+<div id="depositModal" style="display:none;position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--card);padding:30px;border-radius:12px;box-shadow:0 4px 20px rgba(0,0,0,0.3);z-index:10000;">
+    <h3>Deposit to Group Capital</h3>
+    <input type="number" id="depositAmount" placeholder="Amount (KES)" style="width:100%;padding:10px;margin:10px 0;">
+    <button onclick="submitDeposit()" class="btn">Submit</button>
+    <button onclick="closeDeposit()" class="btn btn-danger">Cancel</button>
+</div>
+<script>
+function depositFunds() {
+    document.getElementById('depositModal').style.display = 'block';
+}
+function closeDeposit() {
+    document.getElementById('depositModal').style.display = 'none';
+}
+async function submitDeposit() {
+    const amount = document.getElementById('depositAmount').value;
+    if (!amount) return alert('Enter amount');
+    const res = await fetch('/api/deposit', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ amount: parseFloat(amount) })
+    });
+    const data = await res.json();
+    alert(data.message || data.error);
+    closeDeposit();
+    if (res.ok) loadCapital();
+}
+</script>
+
+<script>
+    const token = '{{ token }}';
+
+    // ---- Agreement functions ----
+    async function acceptAgreement() {
+        const res = await fetch('/api/agreement', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ accepted: true })
+        });
+        if (res.ok) {
+            // Reload page to reflect agreement
+            location.reload();
+        } else {
+            const err = await res.json();
+            alert('Error: ' + err.error);
+        }
+    }
+
+    async function declineAgreement() {
+        await fetch('/api/agreement', {
+            method: 'POST',
+            headers: {
+                'Authorization': 'Bearer ' + token,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ accepted: false })
+        });
+        alert('You declined. You will be logged out.');
+        window.location.href = '/logout';
+    }
+
+    // ---- API calls (only run if agreed) ----
+    {% if user.agreed_to_policy %}
+    async function loadCapital() {
+        const res = await fetch('/api/group/capital', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) {
+            const data = await res.json();
+            document.getElementById('capitalBalance').textContent = 'KES ' + (data.balance || 0).toFixed(2);
+        } else {
+            document.getElementById('capitalBalance').textContent = 'Error loading capital';
+        }
+    }
+    async function refreshCapital() { loadCapital(); }
+
+    async function loadMembers() {
+        const res = await fetch('/api/group/members', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) {
+            const data = await res.json();
+            document.getElementById('membersList').innerHTML = data.map(u => `<div class="card-item">${u.name} (${u.role}) – ${u.primary_phone}</div>`).join('');
+        } else {
+            document.getElementById('membersList').innerHTML = '<div class="card-item">Error loading members</div>';
+        }
+    }
+
+    async function loadTransactions() {
+        const res = await fetch('/api/group/transactions/today', { headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) {
+            const data = await res.json();
+            document.getElementById('transactionsList').innerHTML = data.map(t => `<div class="card-item"><strong>${t.user_name}</strong> – ${t.type} – KES ${t.amount} <span class="text-muted">${t.created_at}</span></div>`).join('') || '<div class="card-item">No transactions today.</div>';
+        } else {
+            document.getElementById('transactionsList').innerHTML = '<div class="card-item">Error loading transactions</div>';
+        }
+    }
+
+    // Load data on page load
+    loadCapital();
+    loadMembers();
+    loadTransactions();
+    {% endif %}
+</script>
+{% endblock %}
+

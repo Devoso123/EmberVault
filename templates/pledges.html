@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Pledges{% endblock %}
+{% block content %}
+<h2 style="color:var(--primary);">📌 Pledges</h2>
+<div class="card">
+    <h4>Create Pledge</h4>
+    <form id="pledgeForm">
+        <div class="form-group"><label>Amount (KES)</label><input type="number" id="pledgeAmount" required></div>
+        <div class="form-group"><label>Due Date</label><input type="datetime-local" id="pledgeDueDate" required></div>
+        <div class="form-group"><label>Description</label><input type="text" id="pledgeDesc"></div>
+        <div class="form-group"><label><input type="checkbox" id="pledgePrivate"> Private (heads only)</label></div>
+        <button type="submit" class="btn">➕ Create</button>
+    </form>
+</div>
+<div id="pledgesList"></div>
+<script>
+    const token = '{{ token }}';
+    async function loadPledges() {
+        const res = await fetch('/api/pledges', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('pledgesList').innerHTML = data.map(p => `
+            <div class="card-item flex-between">
+                <div><strong>${p.user_name}</strong> – KES ${p.amount} – Due: ${p.due_date} – ${p.is_paid ? '✅ Paid' : '⏳ Pending'}</div>
+                <div>
+                    ${!p.is_paid ? `<button class="btn" style="padding:4px 12px; font-size:12px;" onclick="payPledge(${p.id})">Pay</button>
+                    <button class="btn btn-danger" style="padding:4px 12px; font-size:12px;" onclick="deletePledge(${p.id})">Delete</button>` : ''}
+                </div>
+            </div>
+        `).join('') || '<div class="card-item">No pledges.</div>';
+    }
+    document.getElementById('pledgeForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const amount = document.getElementById('pledgeAmount').value;
+        const dueDate = document.getElementById('pledgeDueDate').value;
+        const desc = document.getElementById('pledgeDesc').value;
+        const isPrivate = document.getElementById('pledgePrivate').checked;
+        const res = await fetch('/api/pledges', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: parseFloat(amount), due_date: dueDate, description: desc, is_private: isPrivate })
+        });
+        if (res.ok) { alert('Pledge created.'); loadPledges(); }
+        else { const err = await res.json(); alert('Error: ' + err.error); }
+    });
+    async function payPledge(id) {
+        if (!confirm('Mark as paid?')) return;
+        const res = await fetch(`/api/pledges/${id}/pay`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) { alert('Pledge paid.'); loadPledges(); }
+        else { const err = await res.json(); alert('Error: ' + err.error); }
+    }
+    async function deletePledge(id) {
+        if (!confirm('Delete?')) return;
+        const res = await fetch(`/api/pledges/${id}`, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) { alert('Pledge deleted.'); loadPledges(); }
+        else { const err = await res.json(); alert('Error: ' + err.error); }
+    }
+    loadPledges();
+</script>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Payments{% endblock %}
+{% block content %}
+<h2 style="color:var(--primary);">💳 Make Payment</h2>
+<div class="card">
+    <form id="paymentForm">
+        <div class="form-group"><label>Amount (KES)</label><input type="number" id="paymentAmount" required></div>
+        <div class="form-group"><label>Paybill (optional)</label><input type="text" id="paymentPaybill"></div>
+        <div class="form-group"><label>Account Number (optional)</label><input type="text" id="paymentAccount"></div>
+        <div class="form-group"><label>Till Number (optional)</label><input type="text" id="paymentTill"></div>
+        <div class="form-group"><label>Phone Number (optional)</label><input type="text" id="paymentPhone"></div>
+        <div class="form-group"><label>Payee Name (e.g., Safaricom)</label><input type="text" id="paymentPayee"></div>
+        <button type="submit" class="btn">💸 Pay Now</button>
+    </form>
+</div>
+<div id="paymentsList"></div>
+<script>
+    const token = '{{ token }}';
+    async function loadPayments() {
+        const res = await fetch('/api/group/transactions/today', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('paymentsList').innerHTML = data.map(t => `<div class="card-item"><strong>${t.user_name}</strong> – ${t.type} – KES ${t.amount} – ${t.payee_name || t.description} <span class="text-muted">${t.created_at}</span></div>`).join('') || '<div class="card-item">No payments today.</div>';
+    }
+    document.getElementById('paymentForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const amount = document.getElementById('paymentAmount').value;
+        const paybill = document.getElementById('paymentPaybill').value;
+        const account = document.getElementById('paymentAccount').value;
+        const till = document.getElementById('paymentTill').value;
+        const phone = document.getElementById('paymentPhone').value;
+        const payee_name = document.getElementById('paymentPayee').value;
+        const res = await fetch('/api/payments', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: parseFloat(amount), paybill, account_number: account, till_number: till, phone_number: phone, payee_name })
+        });
+        const data = await res.json();
+        alert(data.message || data.error);
+        if (res.ok) loadPayments();
+    });
+    loadPayments();
+</script>
+{% endblock %}

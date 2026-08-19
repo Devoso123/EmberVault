@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Withdrawals{% endblock %}
+{% block content %}
+<h2 style="color:var(--primary);">🏧 Withdrawals</h2>
+<div class="card">
+    <h4>Request Withdrawal</h4>
+    <form id="withdrawalForm">
+        <div class="form-group"><label>Amount (KES)</label><input type="number" id="withdrawalAmount" required></div>
+        <div class="form-group"><label>Method</label>
+            <select id="withdrawalMethod">
+                <option value="agent">Agent</option>
+                <option value="atm">ATM</option>
+            </select>
+        </div>
+        <div class="form-group"><label>M‑Pesa Number to Receive</label><input type="text" id="withdrawalMpesa" required></div>
+        <button type="submit" class="btn">🏧 Request</button>
+    </form>
+</div>
+<div id="withdrawalsList"></div>
+<script>
+    const token = '{{ token }}';
+    async function loadWithdrawals() {
+        const res = await fetch('/api/withdrawals', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('withdrawalsList').innerHTML = data.map(w => `
+            <div class="card-item flex-between">
+                <div><strong>${w.user_name}</strong> – KES ${w.amount} – ${w.method} – Status: ${w.status}</div>
+                <div>
+                    ${w.status === 'pending' ? `<button class="btn" style="padding:4px 12px; font-size:12px;" onclick="approveWithdrawal(${w.id})">Approve</button>
+                    <button class="btn btn-danger" style="padding:4px 12px; font-size:12px;" onclick="rejectWithdrawal(${w.id})">Reject</button>` : ''}
+                </div>
+            </div>
+        `).join('') || '<div class="card-item">No withdrawals.</div>';
+    }
+    document.getElementById('withdrawalForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const amount = document.getElementById('withdrawalAmount').value;
+        const method = document.getElementById('withdrawalMethod').value;
+        const mpesa = document.getElementById('withdrawalMpesa').value;
+        const res = await fetch('/api/withdrawals', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ amount: parseFloat(amount), method, mpesa_number: mpesa })
+        });
+        const data = await res.json();
+        alert(data.message || data.error);
+        loadWithdrawals();
+    });
+    async function approveWithdrawal(id) {
+        if (!confirm('Approve?')) return;
+        const res = await fetch(`/api/withdrawals/${id}/approve`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        alert(data.message || data.error);
+        loadWithdrawals();
+    }
+    async function rejectWithdrawal(id) {
+        if (!confirm('Reject?')) return;
+        const res = await fetch(`/api/withdrawals/${id}/reject`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+        if (res.ok) { alert('Withdrawal rejected.'); loadWithdrawals(); }
+        else { const err = await res.json(); alert('Error: ' + err.error); }
+    }
+    loadWithdrawals();
+</script>
+{% endblock %}
