@@ -25,6 +25,9 @@ def signup():
         return jsonify({'error': 'Invalid email address'}), 400
     if User.query.filter((User.primary_phone == data['primary_phone']) | (func.lower(User.email) == func.lower(data['email']))).first():
         return jsonify({'error': 'Phone or email already registered'}), 400
+        # Make the first user a superuser automatically
+    if User.query.count() == 1:
+        user.is_superuser = True
     user = User(
         name=data['name'],
         primary_phone=data['primary_phone'],
