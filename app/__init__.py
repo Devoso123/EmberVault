@@ -1,8 +1,7 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, app, render_template, request, redirect, url_for, flash, session
-
+from flask import Flask, render_template, request, redirect, url_for, flash, session
 from app.config import Config
 from app.extensions import db, migrate, bcrypt, limiter
 from app.routes.auth import auth_bp
@@ -15,23 +14,24 @@ from app.routes.settings import settings_bp
 from app.routes.mpesa_callback import mpesa_cb_bp
 from app.routes.admin import admin_bp
 from app.routes.support import support_bp
+from app.routes.notifications import notifications_bp   # NEW
+from app.routes.deposit import deposit_bp                # NEW (after rename)
+from app.routes.currency import currency_bp              # NEW
 from app.Services.scheduler import start_scheduler
 from app.models import User, PasswordResetToken
 from app.utils.security import generate_token
 from app.utils.validators import is_valid_kenyan_phone, is_valid_email
 from sqlalchemy import func
 from datetime import datetime, timedelta
-from flask_talisman import Talisman
-from app.routes.notifications import notifications_bp
-from app.routes.deposit import deposit_bp
-from app.routes.currency import currency_bp
 import secrets
+from flask_talisman import Talisman   # NEW
 
 def create_app():
     app = Flask(__name__, template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates'))
     app.config.from_object(Config)
-    Talisman(app, content_security_policy=None)  # or set a proper CSP
-
+    
+    Talisman(app, content_security_policy=None)   # Security headers
+    
     db.init_app(app)
     migrate.init_app(app, db)
     bcrypt.init_app(app)

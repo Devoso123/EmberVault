@@ -1,10 +1,10 @@
+from app.extensions import db
 from flask import Blueprint, request, jsonify, g
 from app.utils.decorators import login_required, agreed_required
 from app.Services.mpesa import stk_push
 from app.Services.capital import add_deposit
 from app.Services.notifications import create_notification
 from app.models import Transaction
-from app import db
 
 deposit_bp = Blueprint('deposit', __name__, url_prefix='/api/deposit')
 
