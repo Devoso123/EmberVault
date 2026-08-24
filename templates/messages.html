@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Messages{% endblock %}
+{% block content %}
+<h2 style="color:var(--primary);">💬 Messages</h2>
+<div class="flex gap-10">
+    <div class="card" style="flex:1;">
+        <h4>Users</h4>
+        <div id="userList"></div>
+    </div>
+    <div class="card" style="flex:2;">
+        <h4>Conversation</h4>
+        <div id="conversation" style="max-height:400px; overflow-y:auto; margin-bottom:10px;"></div>
+        <form id="messageForm">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="form-group">
+                <textarea id="messageBody" rows="3" placeholder="Type your message..." required></textarea>
+            </div>
+            <button type="submit" class="btn">📤 Send</button>
+        </form>
+    </div>
+</div>
+
+
+<script>
+    const token = '{{ token }}';
+    const currentUserId = {{ user.id }};  // Use this for comparisons
+    let currentRecipient = null;
+
+    async function loadUsers() {
+        const res = await fetch('/api/group/members', { headers: { 'Authorization': 'Bearer ' + token } });
+        const users = await res.json();
+        document.getElementById('userList').innerHTML = users.map(u => `
+            <div class="user-item" onclick="selectUser(${u.id}, '${u.name}')" style="cursor:pointer; padding:8px; border-bottom:1px solid var(--border);">
+                <strong>${u.name}</strong> <small>(${u.role})</small>
+            </div>
+        `).join('');
+    }
+
+    async function selectUser(userId, userName) {
+        currentRecipient = userId;
+        const res = await fetch(`/api/messages/conversation/${userId}`, { headers: { 'Authorization': 'Bearer ' + token } });
+        const msgs = await res.json();
+        document.getElementById('conversation').innerHTML = msgs.map(m => `
+            <div style="text-align: ${m.sender_id === currentUserId ? 'right' : 'left'}; margin: 5px 0;">
+                <strong>${m.sender_name}:</strong> ${m.body} <small class="text-muted">${m.created_at}</small>
+            </div>
+        `).join('') || '<p class="text-muted">No messages yet.</p>';
+    }
+
+    document.getElementById('messageForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!currentRecipient) { alert('Select a user first.'); return; }
+        const body = document.getElementById('messageBody').value;
+        const res = await fetch('/api/messages/send', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ recipient_id: currentRecipient, body })
+        });
+        const data = await res.json();
+        if (res.ok) { document.getElementById('messageBody').value = ''; selectUser(currentRecipient); }
+        else { alert(data.error); }
+    });
+
+    loadUsers();
+</script>
+
+{% endblock %}
