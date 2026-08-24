@@ -1,5 +1,5 @@
-from app.extensions import db
 from flask import Blueprint, request, jsonify, g
+from app.extensions import db
 from app.utils.decorators import login_required, agreed_required
 from app.Services.mpesa import stk_push
 from app.Services.capital import add_deposit

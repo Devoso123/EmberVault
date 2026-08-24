@@ -15,7 +15,7 @@ from app.routes.mpesa_callback import mpesa_cb_bp
 from app.routes.admin import admin_bp
 from app.routes.support import support_bp
 from app.routes.notifications import notifications_bp   # NEW
-from app.routes.deposit import deposit_bp                # NEW (after rename)
+from app.routes.deposits import deposit_bp                # NEW (after rename)
 from app.routes.currency import currency_bp              # NEW
 from app.Services.scheduler import start_scheduler
 from app.models import User, PasswordResetToken
