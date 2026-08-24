@@ -200,4 +200,8 @@ def create_app():
         flash('Logged out.', 'info')
         return redirect(url_for('login_page'))
 
+    with app.app_context():
+        db.create_all()
+
+
     return app
