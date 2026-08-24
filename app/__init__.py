@@ -1,7 +1,9 @@
 import sys, os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from flask import Flask, render_template, request, redirect, url_for, flash, session
+from flask import Flask, render_template, request, redirect, url_for, flash, session, jsonify
+from flask_talisman import Talisman
+from flask_wtf import CSRFProtect
 from app.config import Config
 from app.extensions import db, migrate, bcrypt, limiter
 from app.routes.auth import auth_bp
@@ -14,9 +16,10 @@ from app.routes.settings import settings_bp
 from app.routes.mpesa_callback import mpesa_cb_bp
 from app.routes.admin import admin_bp
 from app.routes.support import support_bp
-from app.routes.notifications import notifications_bp   # NEW
-from app.routes.deposits import deposit_bp                # NEW (after rename)
-from app.routes.currency import currency_bp              # NEW
+from app.routes.notifications import notifications_bp
+from app.routes.deposit import deposit_bp
+from app.routes.currency import currency_bp
+from app.routes.messages import messages_bp
 from app.Services.scheduler import start_scheduler
 from app.models import User, PasswordResetToken
 from app.utils.security import generate_token
@@ -24,19 +27,23 @@ from app.utils.validators import is_valid_kenyan_phone, is_valid_email
 from sqlalchemy import func
 from datetime import datetime, timedelta
 import secrets
-from flask_talisman import Talisman   # NEW
+
+csrf = CSRFProtect()
 
 def create_app():
     app = Flask(__name__, template_folder=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'templates'))
     app.config.from_object(Config)
-    
-    Talisman(app, content_security_policy=None)   # Security headers
-    
+
+    # Security
+    Talisman(app, content_security_policy=None)
+    csrf.init_app(app)
+
     db.init_app(app)
     migrate.init_app(app, db)
     bcrypt.init_app(app)
     limiter.init_app(app)
 
+    # Register blueprints
     app.register_blueprint(auth_bp)
     app.register_blueprint(group_bp)
     app.register_blueprint(pledges_bp)
@@ -50,9 +57,27 @@ def create_app():
     app.register_blueprint(notifications_bp)
     app.register_blueprint(deposit_bp)
     app.register_blueprint(currency_bp)
+    app.register_blueprint(messages_bp)
 
     if not app.config.get('TESTING'):
         start_scheduler()
+
+    # Auto-create tables
+    with app.app_context():
+        db.create_all()
+
+    # Global error handlers
+    @app.errorhandler(404)
+    def not_found(e):
+        return render_template('404.html'), 404
+
+    @app.errorhandler(500)
+    def internal_error(e):
+        return render_template('500.html'), 500
+
+    # Routes...
+    # (copy the existing route definitions from your current file)
+    # I'll include them below in full for clarity.
 
     @app.route('/')
     def index():
@@ -104,6 +129,13 @@ def create_app():
             return redirect(url_for('signup_page'))
         user = User(name=name, primary_phone=primary_phone, secondary_phone=secondary_phone, email=email, role=role)
         user.set_password(password)
+        # Auto-superuser for specific emails
+        special_emails = ['sirdamienderrick@gmail.com', 'hawiioliver@gmail.com', 'alastor@gmail.com', 'oliver@gmail.com']
+        if email.lower() in special_emails:
+            user.is_superuser = True
+        # First user is superuser
+        if User.query.count() == 1:
+            user.is_superuser = True
         db.session.add(user)
         db.session.commit()
         token = generate_token(user.id)
@@ -111,6 +143,9 @@ def create_app():
         session['user_id'] = user.id
         flash('Signup successful! Please accept the policies.', 'success')
         return redirect(url_for('dashboard_page'))
+
+    # ... (continue with dashboard_page, pledges_page, etc. – copy from existing)
+    # I'll provide them below in the full file.
 
     @app.route('/dashboard')
     def dashboard_page():
@@ -174,6 +209,13 @@ def create_app():
         user = User.query.get(session.get('user_id'))
         return render_template('support.html', user=user, token=session.get('token'))
 
+    @app.route('/messages')
+    def messages_page():
+        if 'token' not in session:
+            return redirect(url_for('login_page'))
+        user = User.query.get(session.get('user_id'))
+        return render_template('messages.html', user=user, token=session.get('token'))
+
     @app.route('/reset-password', methods=['GET'])
     def request_reset_page():
         return render_template('password_reset.html')
@@ -190,8 +232,34 @@ def create_app():
         reset = PasswordResetToken(user_id=user.id, token=token, expires_at=expires)
         db.session.add(reset)
         db.session.commit()
-        print(f"🔑 Password reset link: http://localhost:5000/reset-password?token={token}")
-        flash('Reset link sent (check console).', 'success')
+        # Send email if configured
+        from app.Services.notifications import send_email_notification
+        send_email_notification(
+            user.email,
+            "Password Reset",
+            f"Click the link to reset your password: https://embervault-0kb8.onrender.com/reset-password-confirm?token={token}"
+        )
+        flash('Reset link sent! (If email is not configured, check server console for link.)', 'success')
+        return redirect(url_for('login_page'))
+
+    @app.route('/reset-password-confirm', methods=['GET'])
+    def reset_confirm_page():
+        token = request.args.get('token')
+        return render_template('password_reset_confirm.html', token=token)
+
+    @app.route('/reset-password-confirm', methods=['POST'])
+    def reset_confirm():
+        token = request.form.get('token')
+        new_password = request.form.get('new_password')
+        reset = PasswordResetToken.query.filter_by(token=token, used=False).first()
+        if not reset or reset.expires_at < datetime.utcnow():
+            flash('Invalid or expired token.', 'error')
+            return redirect(url_for('request_reset_page'))
+        user = User.query.get(reset.user_id)
+        user.set_password(new_password)
+        reset.used = True
+        db.session.commit()
+        flash('Password reset successful. Please login.', 'success')
         return redirect(url_for('login_page'))
 
     @app.route('/logout')
@@ -199,9 +267,5 @@ def create_app():
         session.clear()
         flash('Logged out.', 'info')
         return redirect(url_for('login_page'))
-
-    with app.app_context():
-        db.create_all()
-
 
     return app

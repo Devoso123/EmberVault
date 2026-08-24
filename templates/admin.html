@@ -5,49 +5,101 @@
 <div class="flex flex-wrap gap-10 mb-10">
     <button class="btn btn-gold" onclick="loadUsers()">👥 Users</button>
     <button class="btn btn-gold" onclick="loadAllTransactions()">📊 All Transactions</button>
+    <button class="btn btn-gold" onclick="loadAllPledges()">📌 All Pledges</button>
+    <button class="btn btn-gold" onclick="loadAllLoans()">🏦 All Loans</button>
+    <button class="btn btn-gold" onclick="loadAllWithdrawals()">🏧 All Withdrawals</button>
     <button class="btn btn-gold" onclick="loadAuditLogs()">📜 Audit Logs</button>
 </div>
 <div id="adminContent">
     <p class="text-muted">Click a button above to view data.</p>
 </div>
+
 <script>
     const token = '{{ token }}';
+    const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+
     async function loadUsers() {
         const res = await fetch('/api/admin/users', { headers: { 'Authorization': 'Bearer ' + token } });
         const data = await res.json();
         document.getElementById('adminContent').innerHTML = data.map(u => `
             <div class="card-item flex-between">
-                <div><strong>${u.name}</strong> (${u.role}) – ${u.email} – ${u.is_active ? 'Active' : 'Inactive'} ${u.is_banned ? '🚫 Banned' : ''} ${u.is_superuser ? '★' : ''}</div>
+                <div>
+                    <strong>${u.name}</strong> (${u.role}) – ${u.email} – ${u.is_active ? 'Active' : 'Inactive'} 
+                    ${u.is_banned ? '🚫 Banned' : ''} ${u.is_superuser ? '★' : ''} ${u.is_moderator ? '🛡️ Mod' : ''}
+                </div>
                 <div>
                     ${!u.is_superuser ? `
-                        <button class="btn" style="padding:2px 10px; font-size:12px;" onclick="banUser(${u.id})">${u.is_banned ? 'Unban' : 'Ban'}</button>
+                        <button class="btn" style="padding:2px 10px; font-size:12px;" onclick="toggleBan(${u.id})">${u.is_banned ? 'Unban' : 'Ban'}</button>
                         <button class="btn" style="padding:2px 10px; font-size:12px;" onclick="toggleModerator(${u.id})">${u.is_moderator ? 'Remove Mod' : 'Make Mod'}</button>
+                        <button class="btn" style="padding:2px 10px; font-size:12px;" onclick="makeHead(${u.id})">Promote Head</button>
                     ` : ''}
                 </div>
             </div>
         `).join('');
     }
-    async function banUser(id) {
+
+    async function toggleBan(id) {
         if (!confirm('Toggle ban?')) return;
         const res = await fetch(`/api/admin/users/${id}/ban`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
-        if (res.ok) { alert('User banned.'); loadUsers(); }
-        else { const err = await res.json(); alert('Error: ' + err.error); }
+        const data = await res.json();
+        alert(data.message || data.error);
+        loadUsers();
     }
+
     async function toggleModerator(id) {
         if (!confirm('Toggle moderator?')) return;
         const res = await fetch(`/api/admin/users/${id}/make_moderator`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
-        if (res.ok) { alert('Moderator status toggled.'); loadUsers(); }
-        else { const err = await res.json(); alert('Error: ' + err.error); }
+        const data = await res.json();
+        alert(data.message || data.error);
+        loadUsers();
     }
+
+    async function makeHead(id) {
+        if (!confirm('Promote to Head?')) return;
+        const res = await fetch(`/api/admin/users/${id}/make_head`, { method: 'POST', headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        alert(data.message || data.error);
+        loadUsers();
+    }
+
     async function loadAllTransactions() {
         const res = await fetch('/api/admin/transactions', { headers: { 'Authorization': 'Bearer ' + token } });
         const data = await res.json();
-        document.getElementById('adminContent').innerHTML = data.map(t => `<div class="card-item">${t.user_name} – ${t.type} – KES ${t.amount} – ${t.created_at}</div>`).join('') || '<div class="card-item">No transactions.</div>';
+        document.getElementById('adminContent').innerHTML = data.map(t => `
+            <div class="card-item">${t.user_name} – ${t.type} – KES ${t.amount} – ${t.created_at} ${t.payee_name ? `– ${t.payee_name}` : ''}</div>
+        `).join('') || '<div class="card-item">No transactions.</div>';
     }
+
+    async function loadAllPledges() {
+        const res = await fetch('/api/admin/pledges', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('adminContent').innerHTML = data.map(p => `
+            <div class="card-item">${p.user_name} – KES ${p.amount} – Due: ${p.due_date} – ${p.is_paid ? 'Paid' : 'Pending'}</div>
+        `).join('') || '<div class="card-item">No pledges.</div>';
+    }
+
+    async function loadAllLoans() {
+        const res = await fetch('/api/admin/loans', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('adminContent').innerHTML = data.map(l => `
+            <div class="card-item">${l.borrower_name} – KES ${l.amount} – Status: ${l.status} – ${l.created_at}</div>
+        `).join('') || '<div class="card-item">No loans.</div>';
+    }
+
+    async function loadAllWithdrawals() {
+        const res = await fetch('/api/admin/withdrawals', { headers: { 'Authorization': 'Bearer ' + token } });
+        const data = await res.json();
+        document.getElementById('adminContent').innerHTML = data.map(w => `
+            <div class="card-item">${w.user_name} – KES ${w.amount} – Method: ${w.method} – Status: ${w.status} – ${w.created_at}</div>
+        `).join('') || '<div class="card-item">No withdrawals.</div>';
+    }
+
     async function loadAuditLogs() {
         const res = await fetch('/api/admin/audit-logs', { headers: { 'Authorization': 'Bearer ' + token } });
         const data = await res.json();
-        document.getElementById('adminContent').innerHTML = data.map(l => `<div class="card-item"><strong>${l.user_name}</strong> – ${l.action} – ${l.details} <span class="text-muted">${l.created_at}</span></div>`).join('') || '<div class="card-item">No logs.</div>';
+        document.getElementById('adminContent').innerHTML = data.map(l => `
+            <div class="card-item"><strong>${l.user_name}</strong> – ${l.action} – ${l.details} <span class="text-muted">${l.created_at}</span></div>
+        `).join('') || '<div class="card-item">No logs.</div>';
     }
 </script>
 {% endblock %}

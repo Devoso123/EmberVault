@@ -17,15 +17,13 @@ def send_email_notification(recipient_email, subject, body):
         sender = current_app.config.get('EMAIL_USER')
         password = current_app.config.get('EMAIL_PASSWORD')
         if not sender or not password:
-            logging.warning("Email not configured.")
+            logging.warning("Email not configured. Skipping email notification.")
             return False
-        
         msg = MIMEMultipart()
         msg['From'] = sender
         msg['To'] = recipient_email
         msg['Subject'] = subject
         msg.attach(MIMEText(body, 'plain'))
-        
         server = smtplib.SMTP('smtp.gmail.com', 587)
         server.starttls()
         server.login(sender, password)

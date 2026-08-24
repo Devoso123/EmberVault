@@ -1,29 +1,30 @@
 {% extends "base.html" %}
 {% block title %}Messages{% endblock %}
 {% block content %}
-<h2 style="color:var(--primary);">💬 Messages</h2>
-<div class="flex gap-10">
-    <div class="card" style="flex:1;">
-        <h4>Users</h4>
-        <div id="userList"></div>
-    </div>
-    <div class="card" style="flex:2;">
-        <h4>Conversation</h4>
-        <div id="conversation" style="max-height:400px; overflow-y:auto; margin-bottom:10px;"></div>
-        <form id="messageForm">
-            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <div class="form-group">
-                <textarea id="messageBody" rows="3" placeholder="Type your message..." required></textarea>
-            </div>
-            <button type="submit" class="btn">📤 Send</button>
-        </form>
+<div id="messages-page" data-current-user-id="{{ user.id }}">
+    <h2 style="color:var(--primary);">💬 Messages</h2>
+    <div class="flex gap-10">
+        <div class="card" style="flex:1;">
+            <h4>Users</h4>
+            <div id="userList"></div>
+        </div>
+        <div class="card" style="flex:2;">
+            <h4>Conversation</h4>
+            <div id="conversation" style="max-height:400px; overflow-y:auto; margin-bottom:10px;"></div>
+            <form id="messageForm">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="form-group">
+                    <textarea id="messageBody" rows="3" placeholder="Type your message..." required></textarea>
+                </div>
+                <button type="submit" class="btn">📤 Send</button>
+            </form>
+        </div>
     </div>
 </div>
 
-
 <script>
     const token = '{{ token }}';
-    const currentUserId = {{ user.id }};  // Use this for comparisons
+    const currentUserId = parseInt(document.getElementById('messages-page').dataset.currentUserId);
     let currentRecipient = null;
 
     async function loadUsers() {
@@ -63,5 +64,4 @@
 
     loadUsers();
 </script>
-
 {% endblock %}

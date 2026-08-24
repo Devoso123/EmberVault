@@ -99,3 +99,15 @@ def all_withdrawals():
 def audit_logs():
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(100).all()
     return jsonify([log.to_dict() for log in logs]), 200
+
+@admin_bp.route('/users/<int:user_id>/make_head', methods=['POST'])
+@login_required
+@superuser_required
+def make_head(user_id):
+    user = User.query.get_or_404(user_id)
+    user.role = 'head'
+    db.session.commit()
+    # Notify
+    from app.Services.notifications import create_notification
+    create_notification(user.id, "Promoted to Head", "You have been promoted to Head by the admin.")
+    return jsonify({'message': f'{user.email} is now a head'}), 200
