@@ -17,7 +17,7 @@ from app.routes.mpesa_callback import mpesa_cb_bp
 from app.routes.admin import admin_bp
 from app.routes.support import support_bp
 from app.routes.notifications import notifications_bp
-from app.routes.deposit import deposit_bp
+from app.routes.deposits import deposit_bp
 from app.routes.currency import currency_bp
 from app.routes.messages import messages_bp
 from app.Services.scheduler import start_scheduler
