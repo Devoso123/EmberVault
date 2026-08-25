@@ -72,14 +72,16 @@
     </div>
 
     <script>
-        // Boot overlay fade
-        window.addEventListener('load', () => {
-            const overlay = document.getElementById('boot-overlay');
-            setTimeout(() => {
-                overlay.style.opacity = '0';
-                setTimeout(() => overlay.style.display = 'none', 500);
-            }, 500);
-        });
+    // Boot overlay fade – extended to 6.5 seconds total
+    window.addEventListener('load', () => {
+        const overlay = document.getElementById('boot-overlay');
+        setTimeout(() => {
+            overlay.style.opacity = '0';
+            setTimeout(() => overlay.style.display = 'none', 600); // extra fade out time
+        }, 6000); // 6 seconds delay before fading
+    });
+
+
 
         // Theme
         const token = '{{ session.get("token", "") }}';

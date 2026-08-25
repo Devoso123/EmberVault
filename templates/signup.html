@@ -4,6 +4,7 @@
 <div style="max-width:400px; margin:40px auto;">
     <h2 style="color:var(--primary); margin-bottom:20px;">📝 Sign Up</h2>
     <form method="POST" action="/signup">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group"><label>Full Name</label><input type="text" name="name" required></div>
         <div class="form-group"><label>Primary Phone</label><input type="text" name="primary_phone" required></div>
         <div class="form-group"><label>Secondary Phone (optional)</label><input type="text" name="secondary_phone"></div>

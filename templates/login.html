@@ -4,6 +4,7 @@
 <div style="max-width:400px; margin:40px auto;">
     <h2 style="color:var(--primary); margin-bottom:20px;">🔐 Login</h2>
     <form method="POST" action="/login">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group">
             <label>Phone or Email</label>
             <input type="text" name="identifier" required>
