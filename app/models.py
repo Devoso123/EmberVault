@@ -10,16 +10,16 @@ class User(db.Model):
     email = db.Column(db.String(100), unique=True, nullable=False)
     password_hash = db.Column(db.String(128), nullable=False)
     role = db.Column(db.String(20), nullable=False, default='member')
-    profile_pic = db.Column(db.Text)
+    profile_pic = db.Column(db.Text)  # base64
     is_active = db.Column(db.Boolean, default=True)
     is_banned = db.Column(db.Boolean, default=False)
     is_moderator = db.Column(db.Boolean, default=False)
     is_superuser = db.Column(db.Boolean, default=False)
     agreed_to_policy = db.Column(db.Boolean, default=False)
     theme_preference = db.Column(db.String(50), default='light')
+    currency_preference = db.Column(db.String(10), default='KES')
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, onupdate=datetime.utcnow)
-    currency_preference = db.Column(db.String(10), default='KES')
 
     pledges = db.relationship('Pledge', backref='user', lazy=True)
     loans_taken = db.relationship('Loan', foreign_keys='Loan.borrower_id', backref='borrower', lazy=True)
@@ -34,7 +34,6 @@ class User(db.Model):
 
     def to_dict(self):
         return {
-            'currency_preference': self.currency_preference,
             'id': self.id,
             'name': self.name,
             'primary_phone': self.primary_phone,
@@ -44,13 +43,13 @@ class User(db.Model):
             'profile_pic': self.profile_pic,
             'agreed_to_policy': self.agreed_to_policy,
             'theme_preference': self.theme_preference,
+            'currency_preference': self.currency_preference,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'is_active': self.is_active,
             'is_banned': self.is_banned,
             'is_moderator': self.is_moderator,
             'is_superuser': self.is_superuser
-            
         }
 
 class Pledge(db.Model):
@@ -262,8 +261,6 @@ class Notification(db.Model):
             'is_read': self.is_read,
             'created_at': self.created_at.isoformat() if self.created_at else None
         }
-
-
 
 class Message(db.Model):
     __tablename__ = 'messages'

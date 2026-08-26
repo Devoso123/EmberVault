@@ -23,7 +23,8 @@ def deposit():
     if amount <= 0:
         return jsonify({'error': 'Amount must be positive'}), 400
     
-    # Initiate STK Push
+    # Initiate STK Push with retry logic
+    from app.Services.mpesa import stk_push
     phone = g.user.primary_phone
     result = stk_push(phone, amount, f"Deposit to Embervault")
     if result.get('success'):
@@ -51,4 +52,5 @@ def deposit():
             'transaction': tx.to_dict()
         }), 200
     else:
-        return jsonify({'error': 'STK Push failed', 'details': result.get('message')}), 500
+        # Fallback – let user know to try again
+        return jsonify({'error': 'STK Push failed. Please try again.', 'details': result.get('message')}), 500

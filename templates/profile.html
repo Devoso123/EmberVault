@@ -2,18 +2,65 @@
 {% block title %}Profile{% endblock %}
 {% block content %}
 <h2 style="color:var(--primary);">👤 Your Profile</h2>
+
 <div class="card">
+    <h3>Personal Details</h3>
     <form id="profileForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group"><label>Full Name</label><input type="text" id="profileName" required></div>
         <div class="form-group"><label>Primary Phone</label><input type="text" id="profilePhone" required></div>
         <div class="form-group"><label>Email</label><span id="profileEmail" class="text-muted"></span></div>
         <div class="form-group"><label>Role</label><span id="profileRole" class="text-muted"></span></div>
+        <div class="form-group">
+            <label>Profile Picture</label>
+            <input type="file" id="profilePic" accept="image/*" onchange="previewPic()">
+            <img id="profilePicPreview" style="width:100px;height:100px;border-radius:50%;display:none;margin-top:10px;">
+        </div>
         <button type="submit" class="btn">💾 Update Profile</button>
     </form>
 </div>
+
+<div class="card">
+    <h3>Preferences</h3>
+    <div class="form-group">
+        <label>Theme</label>
+        <select id="themeSelect" onchange="setTheme(this.value)">
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+            <option value="old-money">Old Money</option>
+            <option value="emerald">Emerald</option>
+            <option value="midnight">Midnight</option>
+            <option value="sunset">Sunset</option>
+            <option value="ocean">Ocean</option>
+            <option value="lavender">Lavender</option>
+            <option value="forest">Forest</option>
+            <option value="coffee">Coffee</option>
+            <option value="rose">Rose</option>
+            <option value="gold">Gold</option>
+            <option value="silver">Silver</option>
+            <option value="bronze">Bronze</option>
+            <option value="platinum">Platinum</option>
+            <option value="diamond">Diamond</option>
+            <option value="ruby">Ruby</option>
+            <option value="sapphire">Sapphire</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label>Preferred Currency</label>
+        <select id="currencySelect">
+            <option value="KES">KES – Kenyan Shilling</option>
+            <option value="USD">USD – US Dollar</option>
+            <option value="EUR">EUR – Euro</option>
+            <option value="GBP">GBP – British Pound</option>
+        </select>
+        <button class="btn" onclick="savePreferences()">Save Preferences</button>
+    </div>
+</div>
+
 <div class="card">
     <h4>Change Password</h4>
     <form id="passwordForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
         <div class="form-group password-toggle">
             <label>New Password</label>
             <input type="password" id="newPassword" required>
@@ -22,8 +69,16 @@
         <button type="submit" class="btn">🔑 Change Password</button>
     </form>
 </div>
+
+<div class="card">
+    <h4>⚡ Superuser Code</h4>
+    <input type="password" id="superuserCode" placeholder="Enter passcode">
+    <button class="btn btn-gold" onclick="applySuperuserCode()">Activate Superuser</button>
+</div>
+
 <script>
     const token = '{{ token }}';
+
     async function loadProfile() {
         const res = await fetch('/api/me', { headers: { 'Authorization': 'Bearer ' + token } });
         const data = await res.json();
@@ -31,30 +86,92 @@
         document.getElementById('profilePhone').value = data.primary_phone;
         document.getElementById('profileEmail').textContent = data.email;
         document.getElementById('profileRole').textContent = data.role;
+        document.getElementById('themeSelect').value = data.theme_preference || 'light';
+        document.getElementById('currencySelect').value = data.currency_preference || 'KES';
+        if (data.profile_pic) {
+            document.getElementById('profilePicPreview').src = data.profile_pic;
+            document.getElementById('profilePicPreview').style.display = 'block';
+        }
     }
+
+    function previewPic() {
+        const file = document.getElementById('profilePic').files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                document.getElementById('profilePicPreview').src = e.target.result;
+                document.getElementById('profilePicPreview').style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    }
+
     document.getElementById('profileForm').addEventListener('submit', async (e) => {
         e.preventDefault();
         const name = document.getElementById('profileName').value;
         const phone = document.getElementById('profilePhone').value;
+        const profilePic = document.getElementById('profilePicPreview').src || null;
         const res = await fetch('/api/me', {
             method: 'PUT',
             headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, primary_phone: phone })
+            body: JSON.stringify({ name, primary_phone: phone, profile_pic: profilePic })
         });
         if (res.ok) { alert('Profile updated.'); loadProfile(); }
         else { const err = await res.json(); alert('Error: ' + err.error); }
     });
+
     document.getElementById('passwordForm').addEventListener('submit', async (e) => {
         e.preventDefault();
-        const password = document.getElementById('newPassword').value;
+        const new_password = document.getElementById('newPassword').value;
         const res = await fetch('/api/change-password', {
             method: 'POST',
             headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-            body: JSON.stringify({ new_password: password })
+            body: JSON.stringify({ new_password })
         });
         const data = await res.json();
         alert(data.message || data.error);
     });
+
+    async function savePreferences() {
+        const theme = document.getElementById('themeSelect').value;
+        const currency = document.getElementById('currencySelect').value;
+        const res1 = await fetch('/api/settings/theme', {
+            method: 'PUT',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ theme })
+        });
+        const res2 = await fetch('/api/currency/preference', {
+            method: 'PUT',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currency })
+        });
+        if (res1.ok && res2.ok) alert('Preferences saved.');
+        else alert('Error saving preferences.');
+    }
+
+    function setTheme(theme) {
+        document.documentElement.className = 'theme-' + theme;
+        localStorage.setItem('theme', theme);
+    }
+
+    async function applySuperuserCode() {
+        const code = document.getElementById('superuserCode').value;
+        const res = await fetch('/api/enter-superuser-code', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code })
+        });
+        const data = await res.json();
+        alert(data.message || data.error);
+        if (res.ok) location.reload();
+    }
+
+    function togglePassword(id, btn) {
+        const input = document.getElementById(id);
+        if (input.type === 'password') { input.type = 'text'; btn.textContent = '🙈'; }
+        else { input.type = 'password'; btn.textContent = '👁️'; }
+    }
+
     loadProfile();
 </script>
 {% endblock %}

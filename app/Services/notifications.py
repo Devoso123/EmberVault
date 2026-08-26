@@ -5,6 +5,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from flask import current_app
 import logging
+import time
 
 def create_notification(user_id, title, message, link=None):
     notif = Notification(user_id=user_id, title=title, message=message, link=link)

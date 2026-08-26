@@ -22,6 +22,8 @@ def ban_user(user_id):
         return jsonify({'error': 'Cannot ban superuser'}), 400
     user.is_banned = True
     db.session.commit()
+    from app.Services.notifications import create_notification
+    create_notification(user.id, "Account Banned", "Your account has been banned. Contact support.")
     log = AuditLog(user_id=g.user.id, action='ban_user', details=f'Banned user {user.email}')
     db.session.add(log)
     db.session.commit()
@@ -34,6 +36,8 @@ def unban_user(user_id):
     user = User.query.get_or_404(user_id)
     user.is_banned = False
     db.session.commit()
+    from app.Services.notifications import create_notification
+    create_notification(user.id, "Account Unbanned", "Your account has been unbanned. Welcome back!")
     log = AuditLog(user_id=g.user.id, action='unban_user', details=f'Unbanned user {user.email}')
     db.session.add(log)
     db.session.commit()
@@ -48,6 +52,8 @@ def make_moderator(user_id):
         return jsonify({'error': 'Superuser is already above moderator'}), 400
     user.is_moderator = True
     db.session.commit()
+    from app.Services.notifications import create_notification
+    create_notification(user.id, "Moderator Role", "You have been made a moderator.")
     log = AuditLog(user_id=g.user.id, action='make_moderator', details=f'Made {user.email} moderator')
     db.session.add(log)
     db.session.commit()
@@ -60,10 +66,42 @@ def remove_moderator(user_id):
     user = User.query.get_or_404(user_id)
     user.is_moderator = False
     db.session.commit()
+    from app.Services.notifications import create_notification
+    create_notification(user.id, "Moderator Role", "You have been removed as a moderator.")
     log = AuditLog(user_id=g.user.id, action='remove_moderator', details=f'Removed moderator from {user.email}')
     db.session.add(log)
     db.session.commit()
     return jsonify({'message': f'{user.email} is no longer a moderator'}), 200
+
+@admin_bp.route('/users/<int:user_id>/make_head', methods=['POST'])
+@login_required
+@superuser_required
+def make_head(user_id):
+    user = User.query.get_or_404(user_id)
+    user.role = 'head'
+    db.session.commit()
+    from app.Services.notifications import create_notification
+    create_notification(user.id, "Promoted to Head", "You have been promoted to Head by the admin.")
+    log = AuditLog(user_id=g.user.id, action='make_head', details=f'Promoted {user.email} to head')
+    db.session.add(log)
+    db.session.commit()
+    return jsonify({'message': f'{user.email} is now a head'}), 200
+
+@admin_bp.route('/users/<int:user_id>/demote_head', methods=['POST'])
+@login_required
+@superuser_required
+def demote_head(user_id):
+    user = User.query.get_or_404(user_id)
+    if user.is_superuser:
+        return jsonify({'error': 'Cannot demote superuser'}), 400
+    user.role = 'member'
+    db.session.commit()
+    from app.Services.notifications import create_notification
+    create_notification(user.id, "Demoted from Head", "You have been demoted to member by the admin.")
+    log = AuditLog(user_id=g.user.id, action='demote_head', details=f'Demoted {user.email} to member')
+    db.session.add(log)
+    db.session.commit()
+    return jsonify({'message': f'{user.email} is now a member'}), 200
 
 @admin_bp.route('/transactions', methods=['GET'])
 @login_required
@@ -98,16 +136,4 @@ def all_withdrawals():
 @superuser_required
 def audit_logs():
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(100).all()
-    return jsonify([log.to_dict() for log in logs]), 200
-
-@admin_bp.route('/users/<int:user_id>/make_head', methods=['POST'])
-@login_required
-@superuser_required
-def make_head(user_id):
-    user = User.query.get_or_404(user_id)
-    user.role = 'head'
-    db.session.commit()
-    # Notify
-    from app.Services.notifications import create_notification
-    create_notification(user.id, "Promoted to Head", "You have been promoted to Head by the admin.")
-    return jsonify({'message': f'{user.email} is now a head'}), 200
+    return jsonify([log.to_dict() for log in logs]), 200    

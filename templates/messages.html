@@ -5,11 +5,11 @@
     <h2 style="color:var(--primary);">💬 Messages</h2>
     <div class="flex gap-10">
         <div class="card" style="flex:1;">
-            <h4>Users</h4>
+            <h4>Conversations</h4>
             <div id="userList"></div>
         </div>
         <div class="card" style="flex:2;">
-            <h4>Conversation</h4>
+            <h4 id="conversationTitle">Select a user</h4>
             <div id="conversation" style="max-height:400px; overflow-y:auto; margin-bottom:10px;"></div>
             <form id="messageForm">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -18,6 +18,11 @@
                 </div>
                 <button type="submit" class="btn">📤 Send</button>
             </form>
+            {% if user.role == 'head' or user.is_superuser %}
+            <hr>
+            <button class="btn btn-gold" onclick="broadcastMessage()">📢 Broadcast to All</button>
+            <input type="text" id="broadcastBody" placeholder="Broadcast message...">
+            {% endif %}
         </div>
     </div>
 </div>
@@ -31,14 +36,15 @@
         const res = await fetch('/api/group/members', { headers: { 'Authorization': 'Bearer ' + token } });
         const users = await res.json();
         document.getElementById('userList').innerHTML = users.map(u => `
-            <div class="user-item" onclick="selectUser(${u.id}, '${u.name}')" style="cursor:pointer; padding:8px; border-bottom:1px solid var(--border);">
-                <strong>${u.name}</strong> <small>(${u.role})</small>
+            <div class="user-item" onclick="selectUser(${u.id}, '${u.name.replace(/'/g, "\\'")}')" style="cursor:pointer; padding:8px; border-bottom:1px solid var(--border);">
+                <strong>${u.name}</strong> <small>(${u.role}${u.is_superuser ? ' ★' : ''})</small>
             </div>
         `).join('');
     }
 
     async function selectUser(userId, userName) {
         currentRecipient = userId;
+        document.getElementById('conversationTitle').textContent = 'Chat with ' + userName;
         const res = await fetch(`/api/messages/conversation/${userId}`, { headers: { 'Authorization': 'Bearer ' + token } });
         const msgs = await res.json();
         document.getElementById('conversation').innerHTML = msgs.map(m => `
@@ -58,9 +64,26 @@
             body: JSON.stringify({ recipient_id: currentRecipient, body })
         });
         const data = await res.json();
-        if (res.ok) { document.getElementById('messageBody').value = ''; selectUser(currentRecipient); }
-        else { alert(data.error); }
+        if (res.ok) {
+            document.getElementById('messageBody').value = '';
+            selectUser(currentRecipient);
+        } else {
+            alert(data.error);
+        }
     });
+
+    async function broadcastMessage() {
+        const body = document.getElementById('broadcastBody').value;
+        if (!body) return alert('Enter a message');
+        const res = await fetch('/api/messages/broadcast', {
+            method: 'POST',
+            headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ body })
+        });
+        const data = await res.json();
+        alert(data.message || data.error);
+        if (res.ok) document.getElementById('broadcastBody').value = '';
+    }
 
     loadUsers();
 </script>

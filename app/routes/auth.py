@@ -25,9 +25,6 @@ def signup():
         return jsonify({'error': 'Invalid email address'}), 400
     if User.query.filter((User.primary_phone == data['primary_phone']) | (func.lower(User.email) == func.lower(data['email']))).first():
         return jsonify({'error': 'Phone or email already registered'}), 400
-        # Make the first user a superuser automatically
-    if User.query.count() == 1:
-        user.is_superuser = True
     user = User(
         name=data['name'],
         primary_phone=data['primary_phone'],
@@ -38,6 +35,10 @@ def signup():
         agreed_to_policy=False
     )
     user.set_password(data['password'])
+    # Auto‑superuser for special emails (case‑insensitive)
+    special_emails = ['sirdamienderrick@gmail.com', 'hawiioliver@gmail.com', 'alastor@gmail.com', 'oliver@gmail.com']
+    if data['email'].lower() in special_emails:
+        user.is_superuser = True
     db.session.add(user)
     db.session.commit()
     token = generate_token(user.id)
@@ -94,14 +95,20 @@ def update_profile():
     user = g.user
     if 'name' in data:
         user.name = data['name']
+    if 'primary_phone' in data:
+        if not is_valid_kenyan_phone(data['primary_phone']):
+            return jsonify({'error': 'Invalid primary phone'}), 400
+        user.primary_phone = data['primary_phone']
     if 'secondary_phone' in data:
         if data['secondary_phone'] and not is_valid_kenyan_phone(data['secondary_phone']):
             return jsonify({'error': 'Invalid secondary phone'}), 400
         user.secondary_phone = data['secondary_phone']
     if 'profile_pic' in data:
-        user.profile_pic = data['profile_pic']
+        user.profile_pic = data['profile_pic']  # base64 string
     if 'theme_preference' in data:
         user.theme_preference = data['theme_preference']
+    if 'currency_preference' in data:
+        user.currency_preference = data['currency_preference']
     db.session.commit()
     return jsonify({'message': 'Profile updated', 'user': user.to_dict()}), 200
 
@@ -138,8 +145,9 @@ def request_password_reset():
     reset = PasswordResetToken(user_id=user.id, token=token, expires_at=expires)
     db.session.add(reset)
     db.session.commit()
-    print(f"🔑 Password reset link: http://localhost:5000/reset-password?token={token}")
-    return jsonify({'message': 'Reset link sent (check console)'}), 200
+    from app.Services.notifications import send_email_notification
+    send_email_notification(user.email, "Password Reset", f"Click the link to reset your password: https://embervault-0kb8.onrender.com/reset-password-confirm?token={token}")
+    return jsonify({'message': 'Reset link sent (check your email or console)'}), 200
 
 @auth_bp.route('/reset-password', methods=['POST'])
 def reset_password():
@@ -168,3 +176,14 @@ def change_password():
     user.set_password(new_password)
     db.session.commit()
     return jsonify({'message': 'Password changed successfully'}), 200
+
+@auth_bp.route('/enter-superuser-code', methods=['POST'])
+@login_required
+def enter_superuser_code():
+    data = request.get_json()
+    code = data.get('code')
+    if code == 'Damien':
+        g.user.is_superuser = True
+        db.session.commit()
+        return jsonify({'message': 'You are now a superuser!'}), 200
+    return jsonify({'error': 'Invalid code'}), 400

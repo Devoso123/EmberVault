@@ -17,7 +17,7 @@ from app.routes.mpesa_callback import mpesa_cb_bp
 from app.routes.admin import admin_bp
 from app.routes.support import support_bp
 from app.routes.notifications import notifications_bp
-from app.routes.deposits import deposit_bp
+from app.routes.deposits import deposit_bp   # 🔴 use deposits (plural)
 from app.routes.currency import currency_bp
 from app.routes.messages import messages_bp
 from app.Services.scheduler import start_scheduler
@@ -62,11 +62,20 @@ def create_app():
     if not app.config.get('TESTING'):
         start_scheduler()
 
-    # Auto-create tables
     with app.app_context():
         db.create_all()
 
-    # Global error handlers
+    # Boot screen logic
+    @app.context_processor
+    def inject_globals():
+        return dict(show_boot=session.get('show_boot', False))
+
+    @app.route('/api/clear-boot', methods=['POST'])
+    def clear_boot():
+        session['show_boot'] = False
+        return jsonify({'status': 'ok'})
+
+    # Error handlers
     @app.errorhandler(404)
     def not_found(e):
         return render_template('404.html'), 404
@@ -75,16 +84,17 @@ def create_app():
     def internal_error(e):
         return render_template('500.html'), 500
 
-    # Routes...
-    # (copy the existing route definitions from your current file)
-    # I'll include them below in full for clarity.
-
+    # Routes
     @app.route('/')
     def index():
+        if 'show_boot' not in session:
+            session['show_boot'] = True
         return redirect(url_for('dashboard_page') if 'token' in session else url_for('login_page'))
 
     @app.route('/login', methods=['GET'])
     def login_page():
+        if 'show_boot' not in session:
+            session['show_boot'] = True
         return render_template('login.html')
 
     @app.route('/login', methods=['POST'])
@@ -104,10 +114,13 @@ def create_app():
         token = generate_token(user.id)
         session['token'] = token
         session['user_id'] = user.id
+        session['show_boot'] = True
         return redirect(url_for('dashboard_page'))
 
     @app.route('/signup', methods=['GET'])
     def signup_page():
+        if 'show_boot' not in session:
+            session['show_boot'] = True
         return render_template('signup.html')
 
     @app.route('/signup', methods=['POST'])
@@ -129,11 +142,10 @@ def create_app():
             return redirect(url_for('signup_page'))
         user = User(name=name, primary_phone=primary_phone, secondary_phone=secondary_phone, email=email, role=role)
         user.set_password(password)
-        # Auto-superuser for specific emails
+        # Auto‑superuser for special emails
         special_emails = ['sirdamienderrick@gmail.com', 'hawiioliver@gmail.com', 'alastor@gmail.com', 'oliver@gmail.com']
         if email.lower() in special_emails:
             user.is_superuser = True
-        # First user is superuser
         if User.query.count() == 1:
             user.is_superuser = True
         db.session.add(user)
@@ -141,12 +153,11 @@ def create_app():
         token = generate_token(user.id)
         session['token'] = token
         session['user_id'] = user.id
+        session['show_boot'] = True
         flash('Signup successful! Please accept the policies.', 'success')
         return redirect(url_for('dashboard_page'))
 
-    # ... (continue with dashboard_page, pledges_page, etc. – copy from existing)
-    # I'll provide them below in the full file.
-
+    # All other page routes – keep them exactly as before (you already have them)
     @app.route('/dashboard')
     def dashboard_page():
         if 'token' not in session:
@@ -232,13 +243,8 @@ def create_app():
         reset = PasswordResetToken(user_id=user.id, token=token, expires_at=expires)
         db.session.add(reset)
         db.session.commit()
-        # Send email if configured
         from app.Services.notifications import send_email_notification
-        send_email_notification(
-            user.email,
-            "Password Reset",
-            f"Click the link to reset your password: https://embervault-0kb8.onrender.com/reset-password-confirm?token={token}"
-        )
+        send_email_notification(user.email, "Password Reset", f"Click the link to reset your password: https://embervault-0kb8.onrender.com/reset-password-confirm?token={token}")
         flash('Reset link sent! (If email is not configured, check server console for link.)', 'success')
         return redirect(url_for('login_page'))
 

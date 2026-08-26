@@ -274,6 +274,34 @@ body {
     cursor:pointer;
 }
 
+/* Toast pop-up */
+.toast {
+    position:fixed;
+    bottom:20px;
+    right:20px;
+    background:var(--primary);
+    color:white;
+    padding:15px 20px;
+    border-radius:8px;
+    box-shadow:0 4px 12px rgba(0,0,0,0.3);
+    z-index:10000;
+    max-width:300px;
+    animation: slideIn 0.3s ease;
+}
+.toast button {
+    float:right;
+    background:none;
+    border:none;
+    color:white;
+    font-size:18px;
+    cursor:pointer;
+    margin-left:10px;
+}
+@keyframes slideIn {
+    from { transform: translateX(100%); opacity:0; }
+    to { transform: translateX(0); opacity:1; }
+}
+
 /* Responsive */
 @media (max-width:600px) {
     .header {
